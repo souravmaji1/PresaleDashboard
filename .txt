@@ -1,0 +1,430 @@
+let account = '';
+let provider;
+let signer;
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    const connectWalletBtn = document.getElementById('connectWalletBtn');
+    const buyTokensSection = document.getElementById('buyTokensSection');
+    let account = '';
+
+    connectWalletBtn.addEventListener('click', async () => {
+        try {
+            if (window.ethereum) {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                account = accounts[0];
+                handleAccountConnected(account);
+                window.ethereum.on('accountsChanged', handleAccountsChanged);
+            } else {
+                alert('Please install MetaMask!');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    });
+
+    function handleAccountConnected(account) {
+        console.log('Connected account:', account);
+        connectWalletBtn.style.display = 'none';
+        buyTokensSection.style.display = 'block';
+    }
+
+    function handleAccountsChanged(accounts) {
+        if (accounts.length === 0) {
+            console.log('Please connect to MetaMask.');
+            account = '';
+            connectWalletBtn.style.display = 'block';
+            buyTokensSection.style.display = 'none';
+        } else {
+            account = accounts[0];
+            handleAccountConnected(account);
+        }
+    }
+});
+
+
+function disconnectWallet() {
+    account = '';
+    document.getElementById('status').innerText = 'Status: Not Connected';
+    document.getElementById('account').innerText = 'Account: None';
+}
+
+function handleAccountsChanged(accounts) {
+    if (accounts.length === 0) {
+        console.log('Please connect to MetaMask.');
+        disconnectWallet();
+    } else {
+        account = accounts[0];
+        document.getElementById('status').innerText = 'Status: Connected';
+        document.getElementById('account').innerText = `Account: ${account}`;
+    }
+}
+
+async function GenerateReferalCode() {
+    try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const contractaddress = "0x72e55fF6B9e4c197CDECBef057F5a660aA3c8222";
+        const abi = [
+            {
+                "type": "function",
+                "name": "setReferralCode",
+                "inputs": [
+                    {
+                        "type": "bytes32",
+                        "name": "_referralCode",
+                        "internalType": "bytes32"
+                    }
+                ],
+                "outputs": [],
+                "stateMutability": "nonpayable"
+            }
+        ];
+
+        const contract = new ethers.Contract(contractaddress, abi, signer);
+        const referralCodeHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(account));
+
+        console.log(referralCodeHash);
+        const call = await contract.setReferralCode(referralCodeHash);
+        console.log(call);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function BuyTokens() {
+    try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const contractaddress = "0x72e55fF6B9e4c197CDECBef057F5a660aA3c8222";
+        const abi = [
+            {
+                "type": "function",
+                "name": "buyTokensBNB",
+                "inputs": [
+                    {
+                        "type": "uint256",
+                        "name": "_tokenAmount",
+                        "internalType": "uint256"
+                    }
+                ],
+                "outputs": [],
+                "stateMutability": "payable"
+            }
+        ];
+
+        const contract = new ethers.Contract(contractaddress, abi, signer);
+        const amount = document.getElementById('tokenAmount').value;
+        const valueInWei = ethers.utils.parseEther((amount * 0.0017).toString());
+
+        const overrides = { value: valueInWei };
+        const call = await contract.buyTokensBNB(amount, overrides);
+        console.log(call);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function BuyTokensWithEthReferal() {
+    try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const contractaddress = "0x72e55fF6B9e4c197CDECBef057F5a660aA3c8222";
+        const abi = [
+            {
+                "type": "function",
+                "name": "buyTokensWithBNBAndReferral",
+                "inputs": [
+                    {
+                        "type": "uint256",
+                        "name": "_tokenAmount",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "type": "bytes32",
+                        "name": "_referralCode",
+                        "internalType": "bytes32"
+                    }
+                ],
+                "outputs": [],
+                "stateMutability": "payable"
+            }
+        ];
+
+        const contract = new ethers.Contract(contractaddress, abi, signer);
+        
+        // Retrieve and validate token amount
+        const amountInput = document.getElementById('ethTokenAmount').value;
+        if (!amountInput || isNaN(amountInput) || Number(amountInput) <= 0) {
+            throw new Error('Invalid token amount');
+        }
+        const amount = ethers.BigNumber.from(amountInput);
+        
+        // Retrieve and validate referral code
+        let ethReferalCode = document.getElementById('ethReferalCode').value.trim();
+        if (!ethReferalCode) {
+            ethReferalCode = "0x0000000000000000000000000000000000000000000000000000000000000000";
+        } else {
+            ethReferalCode = ethers.utils.formatBytes32String(ethReferalCode);
+        }
+
+        const valueInWei = ethers.utils.parseEther((amount * 0.0017).toString());
+        const overrides = { value: valueInWei };
+
+        const call = await contract.buyTokensWithBNBAndReferral(amount, ethReferalCode, overrides);
+        console.log(call);
+    } catch (error) {
+        console.error(error);
+        alert(error.message);
+    }
+}
+
+
+async function approveUSDC(amount) {
+    try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const usdccontract = "0xD7fEbe89db5eF458bd04d22aF5d3700fd0633C63";
+        const nftabi = [
+            {
+                "type": "function",
+                "name": "approve",
+                "inputs": [
+                    {
+                        "type": "address",
+                        "name": "spender",
+                        "internalType": "address"
+                    },
+                    {
+                        "type": "uint256",
+                        "name": "amount",
+                        "internalType": "uint256"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "type": "bool",
+                        "name": "",
+                        "internalType": "bool"
+                    }
+                ],
+                "stateMutability": "nonpayable"
+            }
+        ];
+
+        const tokenContract = new ethers.Contract(usdccontract, nftabi, signer);
+        const loanContractAddress = "0x72e55fF6B9e4c197CDECBef057F5a660aA3c8222";
+        const weiAmount = amount * 10**6;
+
+        const approveTx = await tokenContract.approve(loanContractAddress, weiAmount);
+        console.log("Approval transaction:", approveTx);
+        await approveTx.wait();
+        console.log("Token approval successful!");
+    } catch (error) {
+        console.error("Error approving token:", error);
+    }
+}
+
+async function BuyTokensWithUSDCReferal() {
+    try {
+        await approveUSDC(document.getElementById('usdcTokenAmount').value);
+
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const contractaddress = "0x72e55fF6B9e4c197CDECBef057F5a660aA3c8222";
+        const abi = [
+            {
+                "type": "function",
+                "name": "buyTokensWithUSDTReferal",
+                "inputs": [
+                    {
+                        "type": "uint256",
+                        "name": "amount",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "type": "bytes32",
+                        "name": "_referralCode",
+                        "internalType": "bytes32"
+                    }
+                ],
+                "outputs": [],
+                "stateMutability": "nonpayable"
+            }
+        ];
+
+        const contract = new ethers.Contract(contractaddress, abi, signer);
+        const amount = document.getElementById('usdcTokenAmount').value;
+        const usdcreferalcode = document.getElementById('usdcReferalCode').value || "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+        const call = await contract.buyTokensWithUSDTReferal(amount, usdcreferalcode);
+        console.log(call);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function BuyTokenswithUSDC() {
+    try {
+        await approveUSDC(document.getElementById('usdcAmount').value);
+
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const contractaddress = "0x72e55fF6B9e4c197CDECBef057F5a660aA3c8222";
+        const abi = [
+            {
+                "type": "function",
+                "name": "buyTokensWithUSDT",
+                "inputs": [
+                    {
+                        "type": "uint256",
+                        "name": "amount",
+                        "internalType": "uint256"
+                    }
+                ],
+                "outputs": [],
+                "stateMutability": "nonpayable"
+            }
+        ];
+
+        const contract = new ethers.Contract(contractaddress, abi, signer);
+        const amount = document.getElementById('usdcAmount').value;
+
+        const call = await contract.buyTokensWithUSDT(amount);
+        console.log(call);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function ClaimTokens() {
+    try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const contractaddress = "0x72e55fF6B9e4c197CDECBef057F5a660aA3c8222";
+        const abi = [
+            {
+                "type": "function",
+                "name": "claimTokens",
+                "inputs": [],
+                "outputs": [],
+                "stateMutability": "nonpayable"
+            }
+        ];
+
+        const contract = new ethers.Contract(contractaddress, abi, signer);
+        const call = await contract.claimTokens();
+        console.log(call);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function ClaimRewards() {
+    try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const contractaddress = "0x72e55fF6B9e4c197CDECBef057F5a660aA3c8222";
+        const abi = [
+            {
+                "type": "function",
+                "name": "withdrawReferralReward",
+                "inputs": [],
+                "outputs": [],
+                "stateMutability": "nonpayable"
+            }
+        ];
+
+        const contract = new ethers.Contract(contractaddress, abi, signer);
+        const call = await contract.withdrawReferralReward();
+        console.log(call);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockchain Interaction</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.6.umd.min.js" type="application/javascript"></script>
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <h1>Blockchain Interaction</h1>
+    <div>
+         <div class="wallet-section">
+        <button id="connectWalletBtn" class="btn btn-primary">Connect Wallet</button>
+    </div>
+    <div id="buyTokensSection" class="bfctokensbtn" style="display: none;">
+        <input type="submit" value="BUY $BTCFANS" class="btn btn-primary rounded-3 hoverbtn w-100">
+    </div>
+        <button onclick="disconnectWallet()">Disconnect Wallet</button>
+        <div id="status">Status: Not Connected</div>
+        <div id="account">Account: None</div>
+    </div>
+
+    <div>
+        <h2>Generate Referral Code</h2>
+        <button onclick="GenerateReferalCode()">Generate Referral Code</button>
+    </div>
+
+    <div>
+        <h2>Buy Tokens</h2>
+        <input type="number" id="tokenAmount" placeholder="Token Amount" />
+        <button onclick="BuyTokens()">Buy Tokens</button>
+    </div>
+
+    <div>
+        <h2>Buy Tokens with ETH Referral</h2>
+        <input type="text" id="ethReferalCode" placeholder="ETH Referral Code" />
+        <input type="number" id="ethTokenAmount" placeholder="Token Amount" />
+        <button onclick="BuyTokensWithEthReferal()">Buy Tokens with ETH Referral</button>
+    </div>
+
+    <div>
+        <h2>Buy Tokens with USDC</h2>
+        <input type="number" id="usdcAmount" placeholder="USDC Amount" />
+        <button onclick="BuyTokenswithUSDC()">Buy Tokens with USDC</button>
+    </div>
+
+    <div>
+        <h2>Buy Tokens with USDC Referral</h2>
+        <input type="text" id="usdcReferalCode" placeholder="USDC Referral Code" />
+        <input type="number" id="usdcTokenAmount" placeholder="USDC Token Amount" />
+        <button onclick="BuyTokensWithUSDCReferal()">Buy Tokens with USDC Referral</button>
+    </div>
+
+    <div>
+        <h2>Claim Tokens</h2>
+        <button onclick="ClaimTokens()">Claim Tokens</button>
+    </div>
+
+    <div>
+        <h2>Claim Rewards</h2>
+        <button onclick="ClaimRewards()">Claim Rewards</button>
+    </div>
+</body>
+</html>
